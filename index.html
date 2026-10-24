@@ -1,0 +1,923 @@
+<!doctype html>
+<html lang="zh-CN" data-page-lang="zh">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Model Inspector · 3D 模型检视器 | Three.js WebGL 作品页</title>
+  <meta name="description" content="Model Inspector：基于 Three.js r170 + Vite 5 的交互式 WebGL 3D 模型检视器——三点布光、程序化展台、PBR 材质检视、拖拽载入 glb/gltf、一键导出 4K 透明背景 PNG，零外部资源、完全离线可用。" />
+  <meta name="color-scheme" content="dark" />
+  <meta name="theme-color" content="#05070a" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%2305070a'/%3E%3Cpath d='M32 12 50 22v20L32 52 14 42V22z' fill='none' stroke='%235ee1ff' stroke-width='3'/%3E%3Cpath d='M32 12v20M32 32 14 22m18 10 18-10M32 32v20' stroke='%238b7bff' stroke-width='3' fill='none'/%3E%3C/svg%3E" />
+
+  <!-- Open Graph -->
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="Model Inspector · 3D 模型检视器" />
+  <meta property="og:description" content="Three.js + Vite 的交互式 WebGL 模型检视器：三点布光、程序化展台、PBR 检视、拖拽载入 glb/gltf、4K 透明背景导出、零外部资源离线可用。" />
+  <meta property="og:url" content="https://yangfanwudi.github.io/model-inspector-site/" />
+  <meta property="og:image" content="https://yangfanwudi.github.io/model-inspector-site/assets/screenshot.png" />
+  <meta property="og:image:width" content="1280" />
+  <meta property="og:image:height" content="720" />
+  <meta property="og:locale" content="zh_CN" />
+  <meta property="og:locale:alternate" content="en_US" />
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Model Inspector · 3D 模型检视器" />
+  <meta name="twitter:description" content="Three.js + Vite 的交互式 WebGL 模型检视器：三点布光、程序化展台、PBR 检视、拖拽载入 glb/gltf、4K 透明背景导出。" />
+  <meta name="twitter:image" content="https://yangfanwudi.github.io/model-inspector-site/assets/screenshot.png" />
+
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "Model Inspector",
+    "applicationCategory": "DesignApplication",
+    "operatingSystem": "Web browser (Node.js 18+ for local development)",
+    "description": "Interactive WebGL 3D model inspector built with Three.js r170 and Vite 5: three-point lighting, procedural pedestal, PBR inspection modes, drag-and-drop glTF loading, one-click 4K transparent PNG export, fully offline with zero external assets.",
+    "inLanguage": ["zh-CN", "en"]
+  }
+  </script>
+
+  <style>
+    /* ================= 基础 ================= */
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #05070a;
+      --bg-2: #0a0d13;
+      --panel: rgba(15, 18, 26, 0.55);
+      --border: rgba(255, 255, 255, 0.09);
+      --text: #e8ecf2;
+      --dim: rgba(232, 236, 242, 0.58);
+      --dimmer: rgba(232, 236, 242, 0.40);
+      --accent: #5ee1ff;
+      --accent-2: #8b7bff;
+      --mono: ui-monospace, "Cascadia Code", Consolas, "JetBrains Mono", Menlo, monospace;
+      --container: 1120px;
+    }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: Inter, "SF Pro Display", -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.7;
+      -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
+    }
+    ::selection { background: rgba(94, 225, 255, 0.28); }
+
+    /* ================= 双语切换 ================= */
+    [data-page-lang="zh"] [data-lang="en"],
+    [data-page-lang="en"] [data-lang="zh"] { display: none; }
+
+    .container { max-width: var(--container); margin: 0 auto; padding: 0 24px; }
+
+    /* ================= 顶栏 ================= */
+    .site-header {
+      position: sticky; top: 0; z-index: 60;
+      background: rgba(5, 7, 10, 0.74);
+      backdrop-filter: blur(18px) saturate(1.35);
+      -webkit-backdrop-filter: blur(18px) saturate(1.35);
+      border-bottom: 1px solid var(--border);
+    }
+    .header-inner { display: flex; align-items: center; gap: 28px; height: 64px; }
+    .brand { display: flex; align-items: center; gap: 11px; text-decoration: none; color: var(--text); }
+    .brand svg { width: 30px; height: 30px; flex: none; filter: drop-shadow(0 0 10px rgba(94,225,255,.45)); }
+    .brand-name { display: flex; flex-direction: column; line-height: 1.2; }
+    .brand-name b { font-size: 15px; letter-spacing: 0.06em; }
+    .brand-name small { font-size: 10.5px; color: var(--dimmer); letter-spacing: 0.08em; }
+    .site-nav { display: flex; gap: 24px; margin-left: auto; }
+    .site-nav a { color: var(--dim); text-decoration: none; font-size: 14px; transition: color 0.18s ease; }
+    .site-nav a:hover { color: var(--accent); }
+    .lang-btn {
+      appearance: none; cursor: pointer; font-family: inherit;
+      font-size: 12.5px; font-weight: 600; letter-spacing: 0.04em;
+      color: var(--accent); background: rgba(94, 225, 255, 0.08);
+      border: 1px solid rgba(94, 225, 255, 0.32);
+      border-radius: 999px; padding: 6px 16px;
+      transition: all 0.18s ease; white-space: nowrap;
+    }
+    .lang-btn:hover { background: rgba(94, 225, 255, 0.16); box-shadow: 0 0 16px rgba(94, 225, 255, 0.25); }
+
+    /* ================= 通用区块 ================= */
+    main section { scroll-margin-top: 84px; padding: 68px 0; }
+    .section-head { max-width: 760px; margin-bottom: 38px; }
+    .eyebrow {
+      color: var(--accent); font-size: 12px; font-weight: 700;
+      letter-spacing: 0.24em; text-transform: uppercase; margin-bottom: 10px;
+      font-family: var(--mono);
+    }
+    .section-head h2 { font-size: clamp(1.5rem, 3vw, 2.05rem); font-weight: 700; letter-spacing: 0.01em; }
+    .section-head .lead { color: var(--dim); margin-top: 12px; font-size: 1.0rem; }
+
+    /* ================= Hero ================= */
+    .hero { position: relative; padding: 78px 0 60px; overflow: hidden; }
+    .hero::before, .hero::after {
+      content: ""; position: absolute; border-radius: 50%;
+      filter: blur(90px); pointer-events: none; z-index: -1;
+    }
+    .hero::before {
+      width: 560px; height: 560px; top: -220px; left: -160px;
+      background: radial-gradient(circle, rgba(94, 225, 255, 0.14), transparent 70%);
+    }
+    .hero::after {
+      width: 620px; height: 620px; bottom: -300px; right: -180px;
+      background: radial-gradient(circle, rgba(139, 123, 255, 0.13), transparent 70%);
+    }
+    .hero-grid { display: grid; grid-template-columns: 1.02fr 0.98fr; gap: 52px; align-items: center; }
+    .hero-kicker {
+      display: inline-flex; align-items: center; gap: 8px;
+      font-family: var(--mono); font-size: 12.5px; letter-spacing: 0.05em;
+      color: var(--accent); background: rgba(94, 225, 255, 0.07);
+      border: 1px solid rgba(94, 225, 255, 0.25);
+      border-radius: 999px; padding: 6px 14px; margin-bottom: 22px;
+    }
+    .hero-kicker::before {
+      content: ""; width: 7px; height: 7px; border-radius: 50%;
+      background: var(--accent); box-shadow: 0 0 10px var(--accent);
+    }
+    h1.hero-title {
+      font-size: clamp(2.5rem, 5.4vw, 3.7rem); font-weight: 800;
+      letter-spacing: -0.01em; line-height: 1.12;
+      background: linear-gradient(120deg, #ffffff 30%, #9fe9ff 70%, #a99bff);
+      -webkit-background-clip: text; background-clip: text;
+      -webkit-text-fill-color: transparent; color: transparent;
+    }
+    .hero-sub { color: var(--dim); font-size: 1.05rem; margin-top: 18px; max-width: 34em; }
+    .cta-row { display: flex; gap: 14px; margin-top: 30px; flex-wrap: wrap; }
+    .btn {
+      display: inline-flex; align-items: center; gap: 9px;
+      text-decoration: none; border-radius: 12px; padding: 12px 26px;
+      font-size: 14.5px; font-weight: 600; transition: all 0.2s ease;
+      font-family: inherit; cursor: pointer;
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      color: #04101c; box-shadow: 0 6px 26px rgba(94, 225, 255, 0.30);
+    }
+    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 10px 34px rgba(94, 225, 255, 0.42); }
+    .btn-ghost { border: 1px solid var(--border); color: var(--text); background: rgba(255, 255, 255, 0.03); }
+    .btn-ghost:hover { border-color: rgba(94, 225, 255, 0.4); background: rgba(94, 225, 255, 0.07); }
+    .chip-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 26px; }
+    .chip {
+      font-size: 12px; padding: 5px 13px; border-radius: 999px;
+      border: 1px solid var(--border); color: var(--dim);
+      background: rgba(255, 255, 255, 0.03); font-family: var(--mono); letter-spacing: 0.02em;
+    }
+    .chip b { color: var(--accent); font-weight: 600; }
+
+    .hero-shot { position: relative; }
+    .shot-frame {
+      border-radius: 16px; overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.13);
+      box-shadow: 0 30px 90px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(94, 225, 255, 0.06), 0 0 70px rgba(94, 225, 255, 0.10);
+      position: relative;
+    }
+    .shot-frame::before {
+      content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none;
+      background: linear-gradient(180deg, rgba(94, 225, 255, 0.06), transparent 18%);
+    }
+    .shot-frame img { display: block; width: 100%; height: auto; }
+    .hero-shot figcaption { margin-top: 14px; font-size: 12.5px; color: var(--dimmer); text-align: center; }
+
+    /* ================= 数据条 ================= */
+    .stats-row {
+      display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px;
+      margin-top: 54px;
+    }
+    .stat {
+      background: var(--panel); border: 1px solid var(--border); border-radius: 15px;
+      padding: 20px 22px; backdrop-filter: blur(12px);
+    }
+    .stat b {
+      display: block; font-family: var(--mono); font-size: 1.65rem; font-weight: 700;
+      background: linear-gradient(120deg, var(--accent), var(--accent-2));
+      -webkit-background-clip: text; background-clip: text;
+      -webkit-text-fill-color: transparent; color: transparent;
+    }
+    .stat span { font-size: 12.5px; color: var(--dim); }
+
+    /* ================= 卡片 ================= */
+    .feature-grid, .tech-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 18px; }
+    .feature-grid > *, .tech-grid > * { min-width: 0; }
+    .card {
+      background: var(--panel); border: 1px solid var(--border); border-radius: 16px;
+      padding: 26px; backdrop-filter: blur(12px);
+      transition: transform 0.22s ease, border-color 0.22s ease, box-shadow 0.22s ease;
+    }
+    .card:hover {
+      transform: translateY(-3px); border-color: rgba(94, 225, 255, 0.36);
+      box-shadow: 0 18px 44px rgba(0, 0, 0, 0.45);
+    }
+    .card .icon {
+      width: 42px; height: 42px; border-radius: 12px; display: grid; place-items: center;
+      background: rgba(94, 225, 255, 0.09); border: 1px solid rgba(94, 225, 255, 0.22);
+      color: var(--accent); margin-bottom: 16px;
+    }
+    .card .icon svg { width: 22px; height: 22px; }
+    .card h3 { font-size: 1.03rem; font-weight: 700; margin-bottom: 9px; }
+    .card p { color: var(--dim); font-size: 0.92rem; overflow-wrap: break-word; }
+    .card p code {
+      font-family: var(--mono); font-size: 0.85em; color: #9fe9ff;
+      background: rgba(94, 225, 255, 0.08); padding: 1px 6px; border-radius: 5px;
+    }
+    .card code.file { color: #ffd9a0; background: rgba(233, 174, 63, 0.10); }
+
+    /* ================= 界面与操作 ================= */
+    .controls-grid { display: grid; grid-template-columns: 0.92fr 1.08fr; gap: 40px; align-items: start; }
+    .panel-shot {
+      position: relative; height: 520px; max-width: 480px;
+      border-radius: 16px; overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.13);
+      box-shadow: 0 24px 70px rgba(0, 0, 0, 0.55);
+      background: var(--bg-2);
+    }
+    .panel-shot img { position: absolute; top: 0; right: 0; height: 1008px; width: auto; max-width: none; }
+    .panel-shot figcaption {
+      position: absolute; left: 0; right: 0; bottom: 0; z-index: 2;
+      padding: 10px 16px; font-size: 12px; color: rgba(232, 236, 242, 0.85);
+      background: linear-gradient(180deg, transparent, rgba(5, 7, 10, 0.88));
+    }
+    .op-block { margin-bottom: 30px; }
+    .op-block:last-child { margin-bottom: 0; }
+    .op-block h3 {
+      font-size: 0.95rem; font-weight: 700; letter-spacing: 0.02em; margin-bottom: 8px;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .op-block h3::before {
+      content: ""; width: 8px; height: 8px; border-radius: 2px; flex: none;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      box-shadow: 0 0 8px rgba(94, 225, 255, 0.6);
+    }
+    .op-block p.note { color: var(--dim); font-size: 0.92rem; }
+    kbd {
+      font-family: var(--mono); font-size: 0.82em; color: #bfe9f7;
+      background: rgba(255, 255, 255, 0.07);
+      border: 1px solid rgba(255, 255, 255, 0.16); border-bottom-width: 2px;
+      border-radius: 6px; padding: 2px 9px; white-space: nowrap;
+    }
+    .kbd-list { list-style: none; }
+    .kbd-list li {
+      display: flex; justify-content: space-between; align-items: center; gap: 18px;
+      padding: 10px 2px; border-bottom: 1px dashed rgba(255, 255, 255, 0.08);
+    }
+    .kbd-list li:last-child { border-bottom: none; }
+    .kbd-list .what { color: var(--dim); font-size: 0.93rem; text-align: right; }
+    .kbd-list .key { flex: none; }
+
+    /* ================= 快速开始 ================= */
+    #quickstart { background: var(--bg-2); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+    .steps { display: grid; gap: 22px; margin-top: 6px; }
+    .step { display: grid; grid-template-columns: 46px 1fr; gap: 20px; align-items: start; }
+    .step > div { min-width: 0; }
+    .step-num {
+      width: 46px; height: 46px; border-radius: 13px; display: grid; place-items: center;
+      font-family: var(--mono); font-weight: 700; font-size: 1.05rem; color: #04101c;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      box-shadow: 0 4px 18px rgba(94, 225, 255, 0.3);
+    }
+    .step h3 { font-size: 1.0rem; font-weight: 700; margin-bottom: 8px; }
+    .step .step-note { color: var(--dim); font-size: 0.92rem; margin-top: 10px; }
+    .code-block {
+      position: relative; background: #06090f;
+      border: 1px solid var(--border); border-radius: 14px; overflow: hidden;
+    }
+    .code-block pre {
+      padding: 18px 20px; overflow-x: auto;
+      font-family: var(--mono); font-size: 0.865rem; line-height: 1.75; color: #cfe3ee;
+    }
+    .code-block .cmt { color: rgba(140, 165, 190, 0.72); }
+    .copy-btn {
+      position: absolute; top: 10px; right: 10px; z-index: 3;
+      appearance: none; cursor: pointer; font-family: inherit;
+      font-size: 11.5px; color: var(--dim); background: rgba(10, 14, 20, 0.9);
+      border: 1px solid var(--border); border-radius: 8px; padding: 5px 12px;
+      transition: all 0.18s ease;
+    }
+    .copy-btn:hover { color: var(--accent); border-color: rgba(94, 225, 255, 0.4); }
+    .req-note {
+      display: flex; gap: 12px; align-items: flex-start;
+      margin-top: 26px; padding: 16px 20px; border-radius: 13px;
+      background: rgba(94, 225, 255, 0.05); border: 1px solid rgba(94, 225, 255, 0.18);
+      color: var(--dim); font-size: 0.92rem;
+    }
+    .req-note svg { width: 18px; height: 18px; flex: none; color: var(--accent); margin-top: 3px; }
+
+    /* ================= 工程结构 ================= */
+    .tree-wrap { max-width: 860px; }
+    pre.tree {
+      background: #06090f; border: 1px solid var(--border); border-radius: 14px;
+      padding: 24px 26px; overflow-x: auto;
+      font-family: var(--mono); font-size: 0.84rem; line-height: 1.85; color: #c4d6e2;
+    }
+    pre.tree .cmt { color: rgba(140, 165, 190, 0.75); }
+    pre.tree .hl { color: #9fe9ff; }
+
+    /* ================= 已知限制 ================= */
+    .limits-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 18px; }
+    .limit-card {
+      background: rgba(200, 57, 43, 0.05); border: 1px solid rgba(200, 57, 43, 0.22);
+      border-radius: 16px; padding: 24px;
+    }
+    .limit-card h3 { font-size: 1.0rem; font-weight: 700; margin-bottom: 9px; display: flex; gap: 10px; align-items: center; }
+    .limit-card h3 svg { width: 18px; height: 18px; color: #ff8d7e; flex: none; }
+    .limit-card p { color: var(--dim); font-size: 0.92rem; }
+
+    /* ================= 页脚 ================= */
+    .site-footer {
+      border-top: 1px solid var(--border);
+      padding: 30px 0; text-align: center;
+      color: var(--dimmer); font-size: 0.92rem; letter-spacing: 0.03em;
+    }
+
+    /* ================= 响应式 ================= */
+    @media (max-width: 980px) {
+      .hero-grid { grid-template-columns: 1fr; gap: 40px; }
+      .controls-grid { grid-template-columns: 1fr; }
+      .stats-row { grid-template-columns: repeat(2, 1fr); }
+      .panel-shot { height: 430px; }
+      .panel-shot img { height: 833px; }
+    }
+    @media (max-width: 720px) {
+      .site-nav { display: none; }
+      .header-inner { height: 58px; }
+      main section { padding: 54px 0; }
+      .hero { padding: 56px 0 44px; }
+      .step { grid-template-columns: 40px 1fr; gap: 14px; }
+      .step-num { width: 40px; height: 40px; font-size: 0.95rem; }
+      .panel-shot { height: 380px; }
+      .panel-shot img { height: 737px; }
+      .kbd-list li { gap: 12px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      * { transition: none !important; }
+    }
+  </style>
+</head>
+<body>
+
+  <header class="site-header">
+    <div class="container header-inner">
+      <a class="brand" href="#top" aria-label="Model Inspector">
+        <svg viewBox="0 0 64 64" aria-hidden="true">
+          <path d="M32 12 50 22v20L32 52 14 42V22z" fill="none" stroke="#5ee1ff" stroke-width="3"/>
+          <path d="M32 12v20M32 32 14 22m18 10 18-10M32 32v20" stroke="#8b7bff" stroke-width="3" fill="none"/>
+        </svg>
+        <span class="brand-name">
+          <b>Model Inspector</b>
+          <small>
+            <span data-lang="zh">3D 数字资产与模型检视器</span>
+            <span data-lang="en">3D Digital Asset &amp; Model Inspector</span>
+          </small>
+        </span>
+      </a>
+      <nav class="site-nav" aria-label="页面导航 / Site navigation">
+        <a href="#features"><span data-lang="zh">特性</span><span data-lang="en">Features</span></a>
+        <a href="#controls"><span data-lang="zh">操作</span><span data-lang="en">Controls</span></a>
+        <a href="#quickstart"><span data-lang="zh">快速开始</span><span data-lang="en">Quick Start</span></a>
+        <a href="#tech"><span data-lang="zh">技术</span><span data-lang="en">Tech</span></a>
+        <a href="#structure"><span data-lang="zh">结构</span><span data-lang="en">Structure</span></a>
+      </nav>
+      <button class="lang-btn" id="lang-toggle" type="button" onclick="switchLang()" aria-label="切换语言 / Switch language">
+        <span data-lang="zh">EN</span>
+        <span data-lang="en">中文</span>
+      </button>
+    </div>
+  </header>
+
+  <main id="top">
+
+    <!-- ============ Hero ============ -->
+    <section class="hero" aria-labelledby="hero-title">
+      <div class="container">
+        <div class="hero-grid">
+          <div class="hero-copy">
+            <p class="hero-kicker">
+              <span data-lang="zh">Three.js + Vite · WebGL 模型检视器</span>
+              <span data-lang="en">Three.js + Vite · WebGL Model Inspector</span>
+            </p>
+            <h1 class="hero-title" id="hero-title">Model Inspector</h1>
+            <p class="hero-sub">
+              <span data-lang="zh">交互式 3D 数字资产与模型检视器：工业级三点布光、程序化展台底座、PBR 材质检视模式、拖拽载入 <code>.glb / .gltf</code>、一键导出 4K 透明背景 PNG——全部贴图由代码程序化生成，零外部资源、完全离线可用。</span>
+              <span data-lang="en">An interactive 3D digital-asset and model inspector: industrial three-point lighting, a procedural pedestal, PBR material inspection modes, drag-and-drop <code>.glb / .gltf</code> loading, and one-click 4K transparent-background PNG export — every texture is generated procedurally in code, with zero external assets and full offline availability.</span>
+            </p>
+            <div class="cta-row">
+              <a class="btn btn-primary" href="#quickstart">
+                <span data-lang="zh">本地运行起来</span>
+                <span data-lang="en">Run It Locally</span>
+              </a>
+              <a class="btn btn-ghost" href="#features">
+                <span data-lang="zh">看看能做什么</span>
+                <span data-lang="en">See What It Does</span>
+              </a>
+            </div>
+            <div class="chip-row">
+              <span class="chip"><b>Three.js</b> r170</span>
+              <span class="chip"><b>Vite</b> 5</span>
+              <span class="chip"><span data-lang="zh"><b>运行时依赖</b> 仅 three</span><span data-lang="en"><b>Runtime dep</b> three only</span></span>
+              <span class="chip"><b>Node.js</b> ≥ 18</span>
+              <span class="chip"><span data-lang="zh">离线可用 · 无外部资源</span><span data-lang="en">Offline · no external assets</span></span>
+            </div>
+          </div>
+          <figure class="hero-shot">
+            <div class="shot-frame">
+              <img src="assets/screenshot.png" width="1280" height="720"
+                   alt="Model Inspector 运行截图：金红双色金属环形结悬于发光的程序化展台上方，右侧为磨砂玻璃控制面板 / Model Inspector screenshot: a gold-red metal torus knot floats above the glowing procedural pedestal, glass control panel on the right" />
+            </div>
+            <figcaption>
+              <span data-lang="zh">实际运行画面（1280 × 720）：默认样例「金红双色金属环形结」与脉动辉光展台</span>
+              <span data-lang="en">Live capture (1280 × 720): the default gold-red metal torus-knot sample on the pulsing glow pedestal</span>
+            </figcaption>
+          </figure>
+        </div>
+
+        <div class="stats-row" role="list" aria-label="关键指标 / Key numbers">
+          <div class="stat" role="listitem">
+            <b>3840px</b>
+            <span><span data-lang="zh">4K 透明背景 PNG 导出长边</span><span data-lang="en">Long edge of the 4K transparent PNG export</span></span>
+          </div>
+          <div class="stat" role="listitem">
+            <b>3 + 1</b>
+            <span><span data-lang="zh">主光 / 补光 / 轮廓光 + 半球底光</span><span data-lang="en">Key / fill / rim lights + hemisphere base light</span></span>
+          </div>
+          <div class="stat" role="listitem">
+            <b>4</b>
+            <span><span data-lang="zh">PBR / 黏土 / 线框 / 法线检视模式</span><span data-lang="en">PBR / clay / wireframe / normal inspection modes</span></span>
+          </div>
+          <div class="stat" role="listitem">
+            <b>0</b>
+            <span><span data-lang="zh">外部贴图与网络请求，全部程序化生成</span><span data-lang="en">External textures or network requests — all procedural</span></span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 特性 ============ -->
+    <section id="features" aria-labelledby="features-title">
+      <div class="container">
+        <div class="section-head">
+          <p class="eyebrow">Features</p>
+          <h2 id="features-title">
+            <span data-lang="zh">为「看清楚一个模型」而设计的检视器</span>
+            <span data-lang="en">A viewer built to see a model clearly</span>
+          </h2>
+          <p class="lead">
+            <span data-lang="zh">从布光、展台、材质到导出，每个环节都围绕一件事：把 3D 数字资产放在一个稳定、可复现的舞台上，任意角度地检视它。</span>
+            <span data-lang="en">Lighting, staging, materials, export — every part serves one goal: put a 3D digital asset on a stable, reproducible stage and inspect it from any angle.</span>
+          </p>
+        </div>
+
+        <div class="feature-grid">
+          <article class="card">
+            <div class="icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9 17 7M7 17l-2.1 2.1"/></svg>
+            </div>
+            <h3><span data-lang="zh">工业级三点布光</span><span data-lang="en">Industrial three-point lighting</span></h3>
+            <p>
+              <span data-lang="zh">暖色主光投射 2048 × 2048 动态软阴影，冷色补光柔化暗部，背后轮廓光勾出边缘，再叠一层半球底光避免死黑——每盏灯的颜色与强度都实时可调。</span>
+              <span data-lang="en">A warm key light casting 2048 × 2048 soft dynamic shadows, a cool fill light lifting the shadows, a rim light carving the silhouette, plus a hemisphere base light against pitch black — color and intensity of every light adjustable in real time.</span>
+            </p>
+          </article>
+
+          <article class="card">
+            <div class="icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><ellipse cx="12" cy="6.5" rx="8" ry="3"/><path d="M4 6.5v11c0 1.66 3.58 3 8 3s8-1.34 8-3v-11"/><path d="M4 12c0 1.66 3.58 3 8 3s8-1.34 8-3"/></svg>
+            </div>
+            <h3><span data-lang="zh">程序化展台底座</span><span data-lang="en">Procedural pedestal</span></h3>
+            <p>
+              <span data-lang="zh">微锥度金属圆盘 + 同心拉丝顶面 + 接地 AO 径向渐变地面；顶缘辉光环与地面晕圈由自定义 GLSL 着色器渲染，带时间脉动与三瓣旋转扫光。</span>
+              <span data-lang="en">A micro-tapered metal disc with a concentric brushed-metal top and a radial ground-AO gradient floor; the glowing rim ring and floor halo are rendered by custom GLSL shaders with time-based pulsing and a three-lobe rotating sweep.</span>
+            </p>
+          </article>
+
+          <article class="card">
+            <div class="icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><path d="M17.5 13.5v8M13.5 17.5h8"/></svg>
+            </div>
+            <h3><span data-lang="zh">PBR 材质检视模式</span><span data-lang="en">PBR material inspection modes</span></h3>
+            <p>
+              <span data-lang="zh">标准 PBR / 纯白黏土 / 拓扑线框 / 法线检查四模式一键切换（快捷键 <code>1–4</code>）；切换时原始材质被缓存，回到 PBR 自动还原。</span>
+              <span data-lang="en">One click (or keys <code>1–4</code>) switches between standard PBR, matte white clay, wireframe topology, and normal-map check modes; original materials are cached and restored when you switch back to PBR.</span>
+            </p>
+          </article>
+
+          <article class="card">
+            <div class="icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v10"/><path d="m8 9 4 4 4-4"/><path d="M4 15v3a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3v-3"/></svg>
+            </div>
+            <h3><span data-lang="zh">拖拽载入 glb / gltf</span><span data-lang="en">Drag-and-drop glb / gltf loading</span></h3>
+            <p>
+              <span data-lang="zh">把模型文件直接拖进浏览器窗口：<code>.glb</code> 单文件直读；<code>.gltf</code> 连同引用的 <code>.bin</code> 与贴图一起拖入，通过 blob URL 映射在无服务器环境下完成解析。也可点击顶栏「打开模型文件」。</span>
+              <span data-lang="en">Drop model files straight into the browser window: a single <code>.glb</code> parses directly; a <code>.gltf</code> can be thrown in together with its referenced <code>.bin</code> and textures, resolved via a blob-URL mapping with no local server. The top-bar “Open model file” button works too.</span>
+            </p>
+          </article>
+
+          <article class="card">
+            <div class="icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><circle cx="12" cy="12" r="3"/></svg>
+            </div>
+            <h3><span data-lang="zh">自动取景与显存管理</span><span data-lang="en">Auto framing &amp; GPU memory care</span></h3>
+            <p>
+              <span data-lang="zh">载入新模型前自动卸载旧模型并逐项释放几何 / 材质 / 贴图；随后按包围盒归一化缩放、居中落于展台，依视场角计算相机距离并平滑补间过渡，任意模型开箱即完整入画。</span>
+              <span data-lang="en">Loading a new model first disposes the old one — geometries, materials and textures, item by item; the new model is then normalized by bounding box, centered on the pedestal, and the camera distance is computed from the field of view with a smooth tween, so any model is fully framed out of the box.</span>
+            </p>
+          </article>
+
+          <article class="card">
+            <div class="icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 3v5h-5"/></svg>
+            </div>
+            <h3><span data-lang="zh">视角预设与无级转台</span><span data-lang="en">View presets &amp; stepless turntable</span></h3>
+            <p>
+              <span data-lang="zh">正视 / 侧视 / 俯视 / 透视复位四组预设，切换带阻尼补间；转台 0–2 rad/s 无级调速自动旋转，空格键随时暂停 / 恢复，双击视口回到默认 3/4 视角。</span>
+              <span data-lang="en">Four presets — front, side, top and perspective reset — transition with damped easing; the turntable spins steplessly from 0 to 2 rad/s, Space pauses and resumes, and double-clicking the viewport returns to the default 3/4 view.</span>
+            </p>
+          </article>
+
+          <article class="card">
+            <div class="icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>
+            </div>
+            <h3><span data-lang="zh">4K 透明背景导出</span><span data-lang="en">4K transparent export</span></h3>
+            <p>
+              <span data-lang="zh">一键渲染长边 3840px 的透明背景 PNG，仅含模型本体：导出瞬间隐藏展台与场景背景，离屏渲染后回读像素、垂直翻转、编码下载，最后完整还原取景现场。</span>
+              <span data-lang="en">One click renders a transparent-background PNG with a 3840px long edge, model only: the pedestal and scene background are hidden for the shot, pixels are read back off-screen, flipped, encoded and downloaded — then the entire scene state is restored.</span>
+            </p>
+          </article>
+
+          <article class="card">
+            <div class="icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M2 2l20 20"/><path d="M8.5 16.5a5 5 0 0 1 7 0"/><path d="M5 12.9a10 10 0 0 1 3.2-2.1"/><path d="M19 12.9a10 10 0 0 0-6.5-2.9"/></svg>
+            </div>
+            <h3><span data-lang="zh">零外部资源，离线可用</span><span data-lang="en">Zero external assets, fully offline</span></h3>
+            <p>
+              <span data-lang="zh">金红金属底色、铸造锤纹法线、AO 渐变、拉丝粗糙度——全部贴图由 Canvas 在运行时程序化生成，断网可用，运行时依赖只有 <code>three</code> 一个包。</span>
+              <span data-lang="en">Gold-red base color, cast-hammered normal map, AO gradient, brushed roughness — every texture is generated procedurally on a Canvas at runtime. Works with no network; the only runtime dependency is <code>three</code>.</span>
+            </p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 界面与操作 ============ -->
+    <section id="controls" aria-labelledby="controls-title">
+      <div class="container">
+        <div class="section-head">
+          <p class="eyebrow">Controls</p>
+          <h2 id="controls-title">
+            <span data-lang="zh">界面与操作</span>
+            <span data-lang="en">Interface &amp; Controls</span>
+          </h2>
+          <p class="lead">
+            <span data-lang="zh">全屏视口 + 磨砂玻璃控制面板：一只鼠标、三个快捷键，就能完成从载入到导出的全部检视流程。</span>
+            <span data-lang="en">A full-screen viewport plus a frosted-glass control panel: one mouse and three shortcuts cover the whole inspect-and-export workflow.</span>
+          </p>
+        </div>
+
+        <div class="controls-grid">
+          <figure class="panel-shot">
+            <img src="assets/screenshot.png" width="1280" height="720"
+                 alt="控制面板局部：视角、材料、灯光、转台、渲染与模型信息分区 / Control panel detail: view, material, lighting, turntable, render and model-info sections"
+                 loading="lazy" />
+            <figcaption>
+              <span data-lang="zh">右侧控制面板（运行截图局部）：视角 / 材料 / 灯光 / 转台 / 渲染 / 模型信息</span>
+              <span data-lang="en">The right-side control panel (cropped from the live screenshot): views / material / lighting / turntable / render / model info</span>
+            </figcaption>
+          </figure>
+
+          <div>
+            <div class="op-block">
+              <h3><span data-lang="zh">鼠标</span><span data-lang="en">Mouse</span></h3>
+              <ul class="kbd-list">
+                <li><span class="key"><kbd><span data-lang="zh">左键拖拽</span><span data-lang="en">Left-drag</span></kbd></span><span class="what"><span data-lang="zh">旋转视角</span><span data-lang="en">Orbit the camera</span></span></li>
+                <li><span class="key"><kbd><span data-lang="zh">滚轮</span><span data-lang="en">Wheel</span></kbd></span><span class="what"><span data-lang="zh">缩放视距</span><span data-lang="en">Zoom in / out</span></span></li>
+                <li><span class="key"><kbd><span data-lang="zh">右键拖拽</span><span data-lang="en">Right-drag</span></kbd></span><span class="what"><span data-lang="zh">平移视角</span><span data-lang="en">Pan the view</span></span></li>
+                <li><span class="key"><kbd><span data-lang="zh">双击视口</span><span data-lang="en">Double-click</span></kbd></span><span class="what"><span data-lang="zh">复位到默认 3/4 视角</span><span data-lang="en">Reset to the default 3/4 view</span></span></li>
+              </ul>
+            </div>
+
+            <div class="op-block">
+              <h3><span data-lang="zh">键盘快捷键</span><span data-lang="en">Keyboard shortcuts</span></h3>
+              <ul class="kbd-list">
+                <li><span class="key"><kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> <kbd>4</kbd></span><span class="what"><span data-lang="zh">切换 PBR / 黏土 / 线框 / 法线模式</span><span data-lang="en">Switch PBR / clay / wireframe / normal modes</span></span></li>
+                <li><span class="key"><kbd>F</kbd></span><span class="what"><span data-lang="zh">复位到默认 3/4 视角</span><span data-lang="en">Reset to the default 3/4 view</span></span></li>
+                <li><span class="key"><kbd><span data-lang="zh">空格</span><span data-lang="en">Space</span></kbd></span><span class="what"><span data-lang="zh">暂停 / 恢复转台旋转</span><span data-lang="en">Pause / resume turntable rotation</span></span></li>
+              </ul>
+            </div>
+
+            <div class="op-block">
+              <h3><span data-lang="zh">控制面板</span><span data-lang="en">Control panel</span></h3>
+              <p class="note">
+                <span data-lang="zh">灯光颜色与强度、环境反射强度、转台速度、曝光、后处理开关、视角预设、材质模式与 4K 导出按钮集中在右侧磨砂玻璃面板；模型区实时回显文件名、三角面数、顶点数、材质 / 贴图计数、包围盒尺寸与 FPS。</span>
+                <span data-lang="en">The frosted-glass panel on the right gathers light color &amp; intensity, environment intensity, turntable speed, exposure, a post-processing toggle, view presets, material modes and the 4K export button; the model section echoes the file name, triangle count, vertex count, material / texture counts, bounding-box size and live FPS.</span>
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 快速开始 ============ -->
+    <section id="quickstart" aria-labelledby="quickstart-title">
+      <div class="container">
+        <div class="section-head">
+          <p class="eyebrow">Quick Start</p>
+          <h2 id="quickstart-title">
+            <span data-lang="zh">本地跑起来，只要两步</span>
+            <span data-lang="en">Up and running in two steps</span>
+          </h2>
+          <p class="lead">
+            <span data-lang="zh">整个工程只有 <code>three</code> 与 <code>vite</code> 两个依赖，克隆后在项目根目录执行：</span>
+            <span data-lang="en">The whole project has exactly two dependencies — <code>three</code> and <code>vite</code>. From the project root, run:</span>
+          </p>
+        </div>
+
+        <div class="steps">
+          <div class="step">
+            <div class="step-num">1</div>
+            <div>
+              <h3><span data-lang="zh">安装依赖</span><span data-lang="en">Install dependencies</span></h3>
+              <div class="code-block">
+                <button class="copy-btn" type="button" data-copy="install"></button>
+                <pre data-lang="zh"><span class="cmt"># 安装依赖（仅 three + vite）</span>
+npm install</pre>
+                <pre data-lang="en"><span class="cmt"># Install dependencies (three + vite only)</span>
+npm install</pre>
+              </div>
+            </div>
+          </div>
+
+          <div class="step">
+            <div class="step-num">2</div>
+            <div>
+              <h3><span data-lang="zh">启动开发服务器</span><span data-lang="en">Start the dev server</span></h3>
+              <div class="code-block">
+                <button class="copy-btn" type="button" data-copy="dev"></button>
+                <pre data-lang="zh">npm run dev
+<span class="cmt"># 浏览器打开 http://localhost:5173</span></pre>
+                <pre data-lang="en">npm run dev
+<span class="cmt"># Open http://localhost:5173 in the browser</span></pre>
+              </div>
+              <p class="step-note">
+                <span data-lang="zh">也可以用 <code>npx vite</code> 免全局安装直接运行。启动后即见默认样例「金红双色金属环形结」悬于展台上方。</span>
+                <span data-lang="en">You can also run <code>npx vite</code> without a global install. The default sample — a gold-red two-tone metal torus knot — appears floating above the pedestal on startup.</span>
+              </p>
+            </div>
+          </div>
+
+          <div class="step">
+            <div class="step-num">3</div>
+            <div>
+              <h3><span data-lang="zh">生产构建与预览（可选）</span><span data-lang="en">Production build &amp; preview (optional)</span></h3>
+              <div class="code-block">
+                <button class="copy-btn" type="button" data-copy="build"></button>
+                <pre data-lang="zh">npm run build     <span class="cmt"># 产物输出到 dist/</span>
+npm run preview   <span class="cmt"># 本地预览构建产物</span></pre>
+                <pre data-lang="en">npm run build     <span class="cmt"># Output to dist/</span>
+npm run preview   <span class="cmt"># Preview the build locally</span></pre>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="req-note">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.01"/></svg>
+          <p>
+            <span data-lang="zh">要求 Node.js ≥ 18。工程所有贴图（金红金属、法线凹凸、AO 渐变）均由 Canvas 程序化生成，完全离线可用，无需任何外部资源。</span>
+            <span data-lang="en">Requires Node.js ≥ 18. All project textures (gold-red metal, normal bump, AO gradient) are generated procedurally on Canvas — fully offline, no external resources needed.</span>
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 技术实现 ============ -->
+    <section id="tech" aria-labelledby="tech-title">
+      <div class="container">
+        <div class="section-head">
+          <p class="eyebrow">Under the Hood</p>
+          <h2 id="tech-title">
+            <span data-lang="zh">技术实现</span>
+            <span data-lang="en">Under the Hood</span>
+          </h2>
+          <p class="lead">
+            <span data-lang="zh">没有引入任何渲染之外的库：布光、展台、后处理、导出全部手写在 Three.js r170 之上，源码合计六个模块。</span>
+            <span data-lang="en">No libraries beyond the renderer itself: lighting, staging, post-processing and export are all hand-written on top of Three.js r170, in six source modules.</span>
+          </p>
+        </div>
+
+        <div class="tech-grid">
+          <article class="card">
+            <h3><span data-lang="zh">渲染核心</span><span data-lang="en">Render core</span></h3>
+            <p>
+              <span data-lang="zh">WebGLRenderer 开启抗锯齿与 <code>preserveDrawingBuffer</code>，像素比上限 2；ACES Filmic 色调映射、PCFSoft 软阴影；环境反射由 PMREM + RoomEnvironment 生成，强度默认 0.55 可调（<code class="file">viewer.js</code>）。</span>
+              <span data-lang="en">WebGLRenderer with antialiasing and <code>preserveDrawingBuffer</code>, pixel ratio capped at 2; ACES Filmic tone mapping and PCFSoft shadows; environment reflections come from PMREM + RoomEnvironment, defaulting to an adjustable intensity of 0.55 (<code class="file">viewer.js</code>).</span>
+            </p>
+          </article>
+
+          <article class="card">
+            <h3><span data-lang="zh">布光参数</span><span data-lang="en">Lighting rig</span></h3>
+            <p>
+              <span data-lang="zh">主光暖白 <code>0xfff1e0</code> / 强度 2.4，2048² 阴影贴图；补光冷蓝 <code>0x9fc4ff</code> / 0.55；轮廓光青色 <code>0x7fd0ff</code> / 1.6；半球底光 0.35——颜色与强度全部面板实时可调。</span>
+              <span data-lang="en">Warm-white key light <code>0xfff1e0</code> at 2.4 with a 2048² shadow map; cool-blue fill <code>0x9fc4ff</code> at 0.55; cyan rim <code>0x7fd0ff</code> at 1.6; hemisphere base light at 0.35 — every color and intensity adjustable live from the panel.</span>
+            </p>
+          </article>
+
+          <article class="card">
+            <h3><span data-lang="zh">自定义 GLSL</span><span data-lang="en">Custom GLSL</span></h3>
+            <p>
+              <span data-lang="zh">底座辉光环着色器：高斯衰减的内缘炽热细线 + 时间脉动 + 三瓣旋转扫光，加法混合渲染（<code class="file">pedestal-glow.glsl.js</code>）；后处理合成通道：暗角、径向色差、动态胶片颗粒与亮度保持的饱和度提升（<code class="file">post-composite.glsl.js</code>）。</span>
+              <span data-lang="en">The pedestal glow-ring shader: a Gaussian-falloff hot inner edge, time pulsing and a three-lobe rotating sweep, blended additively (<code class="file">pedestal-glow.glsl.js</code>); the post-composite pass adds vignette, radial chromatic aberration, animated film grain and luma-preserving saturation (<code class="file">post-composite.glsl.js</code>).</span>
+            </p>
+          </article>
+
+          <article class="card">
+            <h3><span data-lang="zh">程序化贴图</span><span data-lang="en">Procedural textures</span></h3>
+            <p>
+              <span data-lang="zh">值噪声 4 倍频高度场经 Sobel 梯度推导出铸造锤纹法线贴图；斜向金红渐变叠加微噪点作底色；地面径向渐变内置展台接地 AO 暗环；展台顶面为同心圆拉丝粗糙度贴图（<code class="file">materials.js</code>）。</span>
+              <span data-lang="en">A 4-octave value-noise height field feeds a Sobel-gradient pass to derive the cast-hammered normal map; a diagonal gold-red gradient gets micro-noise for the base color; the floor’s radial gradient bakes a contact-AO dark ring; the pedestal top uses a concentric brushed-roughness map (<code class="file">materials.js</code>).</span>
+            </p>
+          </article>
+
+          <article class="card">
+            <h3><span data-lang="zh">模型装载管线</span><span data-lang="en">Model loading pipeline</span></h3>
+            <p>
+              <span data-lang="zh">卸载旧模型并逐项 dispose → 归一化缩放（最大边 2.3）→ 居中落台（抬升 2mm 防止平底模型与台面 z-fighting）→ 包围球按视场角取景 → 统计三角面 / 顶点 / 材质 / 贴图（<code class="file">viewer.js</code>）。</span>
+              <span data-lang="en">Dispose the old model item by item → normalize scale (max edge 2.3) → center onto the pedestal (lifted 2mm so flat bottoms don’t z-fight) → frame by bounding sphere and field of view → tally triangles / vertices / materials / textures (<code class="file">viewer.js</code>).</span>
+            </p>
+          </article>
+
+          <article class="card">
+            <h3><span data-lang="zh">glTF 拖拽解析</span><span data-lang="en">glTF drag-and-drop parsing</span></h3>
+            <p>
+              <span data-lang="zh"><code>.glb</code> 以 ArrayBuffer 直读解析；<code>.gltf</code> 多文件混投时，以「文件名 → blob URL」映射表配合 <code>LoadingManager.setURLModifier</code> 重写资源引用，无需本地服务器（<code class="file">dragdrop.js</code>）。</span>
+              <span data-lang="en">A <code>.glb</code> parses directly from its ArrayBuffer; when a <code>.gltf</code> is dropped together with its sidecars, a “filename → blob URL” map plus <code>LoadingManager.setURLModifier</code> rewrites every resource reference — no local server needed (<code class="file">dragdrop.js</code>).</span>
+            </p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 工程结构 ============ -->
+    <section id="structure" aria-labelledby="structure-title">
+      <div class="container">
+        <div class="section-head">
+          <p class="eyebrow">Project Layout</p>
+          <h2 id="structure-title">
+            <span data-lang="zh">工程结构</span>
+            <span data-lang="en">Project Layout</span>
+          </h2>
+          <p class="lead">
+            <span data-lang="zh">六个源码模块，职责清晰：入口组装、渲染核心、面板绑定、拖拽解析、程序化材质与两段 GLSL。</span>
+            <span data-lang="en">Six source modules with clear responsibilities: entry wiring, render core, panel bindings, drag-and-drop parsing, procedural materials and two GLSL shaders.</span>
+          </p>
+        </div>
+
+        <div class="tree-wrap">
+          <pre class="tree" data-lang="zh">├── index.html                        <span class="cmt"># UI 布局（磨砂玻璃面板）+ 全部样式</span>
+├── package.json                      <span class="cmt"># three + vite，dev / build / preview 脚本</span>
+└── src/
+    ├── main.js                       <span class="cmt"># 入口：组装 viewer / gui / 拖拽载入</span>
+    ├── <span class="hl">viewer.js</span>                    <span class="cmt"># 渲染、三点布光、展台、后处理、4K 截图、模型装载</span>
+    ├── gui.js                        <span class="cmt"># 控制面板事件绑定与状态回显</span>
+    ├── dragdrop.js                   <span class="cmt"># 拖拽 + GLTF 多文件解析（URLModifier）</span>
+    ├── materials.js                  <span class="cmt"># 程序化贴图 + 材质四模式切换</span>
+    └── shaders/
+        ├── pedestal-glow.glsl.js     <span class="cmt"># 底座发光环着色器（脉动 + 扫光）</span>
+        └── post-composite.glsl.js    <span class="cmt"># 后处理合成（暗角 / 色差 / 颗粒）</span></pre>
+          <pre class="tree" data-lang="en">├── index.html                        <span class="cmt"># UI layout (glass panel) + all styles</span>
+├── package.json                      <span class="cmt"># three + vite; dev / build / preview scripts</span>
+└── src/
+    ├── main.js                       <span class="cmt"># Entry: wires viewer / gui / drag-and-drop</span>
+    ├── <span class="hl">viewer.js</span>                    <span class="cmt"># Rendering, 3-point lights, pedestal, post FX, 4K capture, model loading</span>
+    ├── gui.js                        <span class="cmt"># Control-panel event bindings &amp; state echo</span>
+    ├── dragdrop.js                   <span class="cmt"># Drag &amp; drop + multi-file GLTF parsing (URLModifier)</span>
+    ├── materials.js                  <span class="cmt"># Procedural textures + four material modes</span>
+    └── shaders/
+        ├── pedestal-glow.glsl.js     <span class="cmt"># Pedestal glow-ring shader (pulse + sweep)</span>
+        └── post-composite.glsl.js    <span class="cmt"># Post composite (vignette / aberration / grain)</span></pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 已知限制 ============ -->
+    <section id="limits" aria-labelledby="limits-title">
+      <div class="container">
+        <div class="section-head">
+          <p class="eyebrow">Known Limits</p>
+          <h2 id="limits-title">
+            <span data-lang="zh">已知限制</span>
+            <span data-lang="en">Known Limits</span>
+          </h2>
+          <p class="lead">
+            <span data-lang="zh">为了让运行时依赖只保留 <code>three</code> 一个包，两件事被有意排除在外。</span>
+            <span data-lang="en">Two things are deliberately left out to keep the runtime dependency list at exactly one package: <code>three</code>.</span>
+          </p>
+        </div>
+
+        <div class="limits-grid">
+          <article class="limit-card">
+            <h3>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17v.01"/></svg>
+              <span data-lang="zh">不支持压缩编码的 glTF</span>
+              <span data-lang="en">No compressed glTF variants</span>
+            </h3>
+            <p>
+              <span data-lang="zh">不支持 Draco / KTX2 / Meshopt 压缩编码的 glTF——这是为保持零额外解码依赖、完全离线可用所做的取舍。</span>
+              <span data-lang="en">glTF files using Draco / KTX2 / Meshopt compression are not supported — a deliberate trade-off to keep zero extra decoder dependencies and full offline availability.</span>
+            </p>
+          </article>
+          <article class="limit-card">
+            <h3>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M13 2 3 14h7l-1 8 10-12h-7l1-8z"/></svg>
+              <span data-lang="zh">.gltf 外部资源需一并拖入</span>
+              <span data-lang="en">.gltf sidecars must be dropped together</span>
+            </h3>
+            <p>
+              <span data-lang="zh">若 <code>.gltf</code> 引用外部 <code>.bin</code> 或贴图文件，请将这些文件与 <code>.gltf</code> 一起拖入浏览器窗口，才能正确完成解析。</span>
+              <span data-lang="en">If a <code>.gltf</code> references external <code>.bin</code> or texture files, drop those files into the browser window together with the <code>.gltf</code> for parsing to succeed.</span>
+            </p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <p>Made with AI · 2026</p>
+    </div>
+  </footer>
+
+  <script>
+    /* ================= 中英双语切换 ================= */
+    function setLang(lang) {
+      var next = lang === 'en' ? 'en' : 'zh';
+      var root = document.documentElement;
+      root.setAttribute('data-page-lang', next);
+      root.setAttribute('lang', next === 'zh' ? 'zh-CN' : 'en');
+      try { localStorage.setItem('mi-lang', next); } catch (e) { /* file:// 等环境不可写时静默跳过 */ }
+      renderCopyButtons('idle');
+    }
+    function switchLang() {
+      var cur = document.documentElement.getAttribute('data-page-lang') || 'zh';
+      setLang(cur === 'zh' ? 'en' : 'zh');
+    }
+
+    /* ================= 代码块复制 ================= */
+    var COPY_LABELS = {
+      idle: { zh: '复制命令', en: 'Copy commands' },
+      ok:   { zh: '已复制 ✓', en: 'Copied ✓' },
+      fail: { zh: '请手动选择复制', en: 'Select & copy manually' }
+    };
+    function currentLang() {
+      return (document.documentElement.getAttribute('data-page-lang') || 'zh') === 'en' ? 'en' : 'zh';
+    }
+    function renderCopyButtons(state) {
+      var lang = currentLang();
+      document.querySelectorAll('.copy-btn').forEach(function (btn) {
+        btn.textContent = COPY_LABELS[state][lang];
+      });
+    }
+    function fallbackCopy(text) {
+      try {
+        var ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed'; ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        var ok = document.execCommand('copy');
+        ta.remove();
+        return ok;
+      } catch (e) { return false; }
+    }
+    document.querySelectorAll('.copy-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var block = btn.closest('.code-block');
+        /* 双语代码块按 data-lang 精确取当前语言的 pre；
+           不依赖 innerText 的渲染语义（display:none 元素会回退为 textContent，恒非空） */
+        var lang = currentLang();
+        var el = block ? block.querySelector('pre[data-lang="' + lang + '"]') : null;
+        var text = el ? el.textContent : '';
+        if (!text.trim()) return;
+        var done = function (ok) {
+          renderCopyButtons(ok ? 'ok' : 'fail');
+          setTimeout(function () { renderCopyButtons('idle'); }, 2000);
+        };
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(text).then(function () { done(true); }, function () { done(fallbackCopy(text)); });
+        } else {
+          done(fallbackCopy(text));
+        }
+      });
+    });
+
+    /* ================= 初始化：读取记忆的语言偏好（默认中文） ================= */
+    (function initLang() {
+      var saved = null;
+      try { saved = localStorage.getItem('mi-lang'); } catch (e) { saved = null; }
+      setLang(saved === 'en' ? 'en' : 'zh');
+    })();
+  </script>
+</body>
+</html>
